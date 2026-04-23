@@ -18,12 +18,25 @@ pipeline {
         GITHUB_ACCOUNT = 'longZhangW'
         SONAR_CREDENTIAL_ID = 'sonar-token'
         APP_NAME = 'devops-java-sample'
+
+        // SonarQube 配置
+        SONAR_HOST_URL = 'http://192.168.77.161:30200'
+        SONAR_PROJECT_KEY = 'devops-java-sample'
+        SONAR_PROJECT_NAME = 'DevOps Java Sample'
     }
 
     stages {
         stage ('checkout scm') {
             steps {
                 checkout(scm)
+            }
+        }
+
+        stage ('unit test') {
+            steps {
+                container ('maven') {
+                    sh 'mvn clean  -gs `pwd`/configuration/settings.xml test'
+                }
             }
         }
 
@@ -45,15 +58,6 @@ pipeline {
                                 -Dsonar.test.binaries=target/test-classes
                         '''
                     }
-                }
-            }
-        }
-
-
-        stage ('unit test') {
-            steps {
-                container ('maven') {
-                    sh 'mvn clean  -gs `pwd`/configuration/settings.xml test'
                 }
             }
         }
