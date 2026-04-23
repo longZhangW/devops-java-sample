@@ -27,6 +27,29 @@ pipeline {
             }
         }
 
+        // ========== 新增：SonarQube 代码质量分析 ==========
+        stage ('SonarQube Analysis') {
+            steps {
+                container ('maven') {
+                    withCredentials([string(credentialsId: SONAR_CREDENTIAL_ID, variable: 'SONAR_TOKEN')]) {
+                        sh '''
+                            # 执行 SonarQube 代码分析
+                            mvn sonar:sonar \\
+                                -Dsonar.host.url=${SONAR_HOST_URL} \\
+                                -Dsonar.login=${SONAR_TOKEN} \\
+                                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \\
+                                -Dsonar.projectName="${SONAR_PROJECT_NAME}" \\
+                                -Dsonar.java.binaries=target/classes \\
+                                -Dsonar.sources=src/main/java \\
+                                -Dsonar.tests=src/test/java \\
+                                -Dsonar.test.binaries=target/test-classes
+                        '''
+                    }
+                }
+            }
+        }
+
+
         stage ('unit test') {
             steps {
                 container ('maven') {
