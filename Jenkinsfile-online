@@ -10,13 +10,19 @@ pipeline {
     }
 
     environment {
-        DOCKER_CREDENTIAL_ID = 'dockerhub-id'
+        DOCKER_CREDENTIAL_ID = 'docker-private-id'
         GITHUB_CREDENTIAL_ID = 'github-id'
         KUBECONFIG_CREDENTIAL_ID = 'demo-kubeconfig'
-        REGISTRY = 'docker.io'
-        DOCKERHUB_NAMESPACE = 'docker_username'
-        GITHUB_ACCOUNT = 'kubesphere'
+        REGISTRY = '192.168.77.137:5000'
+        DOCKERHUB_NAMESPACE = 'admin'
+        GITHUB_ACCOUNT = 'longZhangW'
+        SONAR_CREDENTIAL_ID = 'sonar-token'
         APP_NAME = 'devops-java-sample'
+
+        // SonarQube 配置
+        SONAR_HOST_URL = 'http://192.168.77.161:30200'
+        SONAR_PROJECT_KEY = 'devops-java-sample'
+        SONAR_PROJECT_NAME = 'DevOps Java Sample'
     }
 
     stages {
@@ -33,15 +39,39 @@ pipeline {
                 }
             }
         }
+
+        // ========== 新增：SonarQube 代码质量分析 ==========
+        stage ('SonarQube Analysis') {
+            steps {
+                container ('maven') {
+                    withCredentials([string(credentialsId: SONAR_CREDENTIAL_ID, variable: 'SONAR_TOKEN')]) {
+                        sh '''
+                            # 执行 SonarQube 代码分析
+                            mvn sonar:sonar \\
+                                -Dsonar.host.url=${SONAR_HOST_URL} \\
+                                -Dsonar.login=${SONAR_TOKEN} \\
+                                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \\
+                                -Dsonar.projectName="${SONAR_PROJECT_NAME}" \\
+                                -Dsonar.java.binaries=target/classes \\
+                                -Dsonar.sources=src/main/java \\
+                                -Dsonar.tests=src/test/java \\
+                                -Dsonar.test.binaries=target/test-classes
+                        '''
+                    }
+                }
+            }
+        }
  
         stage ('build & push') {
             steps {
                 container ('maven') {
                     sh 'mvn  -Dmaven.test.skip=true -gs `pwd`/configuration/settings.xml clean package'
-                    sh 'docker build -f Dockerfile-online -t $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER .'
+                    // 使用 nerdctl build 替代 docker build
+                    sh 'nerdctl build -f Dockerfile-online -t $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER .'
                     withCredentials([usernamePassword(passwordVariable : 'DOCKER_PASSWORD' ,usernameVariable : 'DOCKER_USERNAME' ,credentialsId : "$DOCKER_CREDENTIAL_ID" ,)]) {
-                        sh 'echo "$DOCKER_PASSWORD" | docker login $REGISTRY -u "$DOCKER_USERNAME" --password-stdin'
-                        sh 'docker push  $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER'
+                        // 使用 nerdctl login 替代 docker login
+                        sh 'echo "$DOCKER_PASSWORD" | nerdctl login $REGISTRY -u "$DOCKER_USERNAME" --password-stdin'
+                        sh 'nerdctl push  $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER'
                     }
                 }
             }
@@ -53,8 +83,8 @@ pipeline {
            }
            steps{
                 container ('maven') {
-                  sh 'docker tag  $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:latest '
-                  sh 'docker push  $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:latest '
+                  sh 'nerdctl tag  $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:latest '
+                  sh 'nerdctl push  $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:latest '
                 }
            }
         }
@@ -83,8 +113,8 @@ pipeline {
                     sh 'git tag -a $TAG_NAME -m "$TAG_NAME" '
                     sh 'git push http://$GIT_USERNAME:$GIT_PASSWORD@github.com/$GITHUB_ACCOUNT/devops-java-sample.git --tags --ipv4'
                   }
-                sh 'docker tag  $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:$TAG_NAME '
-                sh 'docker push  $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:$TAG_NAME '
+                sh 'nerdctl tag  $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:$TAG_NAME '
+                sh 'nerdctl push  $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:$TAG_NAME '
           }
           }
         }
