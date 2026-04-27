@@ -22,9 +22,21 @@ pipeline {
     SONAR_HOST_URL = 'http://192.168.77.161:30200'
     SONAR_PROJECT_KEY = 'devops-java-sample'
     SONAR_PROJECT_NAME = 'DevOps Java Sample'
+
+    // 可选：增加 Git 网络稳定性
+    GIT_HTTP_LOW_SPEED_LIMIT = '1000'
+    GIT_HTTP_LOW_SPEED_TIME = '60'
   }
 
   stages {
+    stage('checkout scm') {
+      steps {
+        retry(3) {
+          checkout scm
+        }
+      }
+    }
+
     stage('unit test') {
       steps {
         sh 'mvn clean -gs `pwd`/configuration/settings.xml test'
