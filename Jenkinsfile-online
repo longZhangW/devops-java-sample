@@ -24,16 +24,6 @@ pipeline {
     SONAR_PROJECT_NAME = 'DevOps Java Sample'
   }
 
-  stages {
-    stage('checkout scm') {
-      steps {
-        git(
-          branch: env.BRANCH_NAME ?: 'master',
-          url: "https://github.com/${GITHUB_ACCOUNT}/devops-java-sample.git",
-          credentialsId: GITHUB_CREDENTIAL_ID
-        )
-      }
-    }
 
     stage('unit test') {
       steps {
