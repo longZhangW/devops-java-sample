@@ -17,21 +17,21 @@ pipeline {
     DOCKERHUB_NAMESPACE = 'admin'
     GITHUB_ACCOUNT = 'longZhangW'
     APP_NAME = 'devops-java-sample'
-    // 可选：增加 Git 超时和低速度限制
-    GIT_HTTP_LOW_SPEED_LIMIT = '1000'
-    GIT_HTTP_LOW_SPEED_TIME = '60'
   }
 
   stages {
     stage('checkout scm') {
       steps {
-        retry(3) {
+        retry(5) {
           sh '''
-            # 清理 workspace 避免残留
+            # 清理工作区
             rm -rf ./* || true
-            # 禁用 SSL 验证（临时绕开 GnuTLS 错误）
+            # 配置 Git 以适应不稳定网络
+            git config --global http.postBuffer 524288000
+            git config --global http.lowSpeedLimit 0
+            git config --global http.lowSpeedTime 999999
             git config --global http.sslVerify false
-            # 使用浅克隆加快速度，指定分支
+            # 浅克隆，仅获取最新代码
             git clone --depth 1 --branch ${BRANCH_NAME} https://github.com/${GITHUB_ACCOUNT}/devops-java-sample.git .
           '''
         }
