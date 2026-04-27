@@ -31,15 +31,15 @@ pipeline {
       }
     }
 
-
-
     stage('build & push') {
       steps {
-        sh 'mvn -Dmaven.test.skip=true -gs `pwd`/configuration/settings.xml clean package'
-        sh "podman build --tls-verify=false -f Dockerfile-online -t ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:SNAPSHOT-${BRANCH_NAME}-${BUILD_NUMBER} ."
         withCredentials([usernamePassword(passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME', credentialsId: DOCKER_CREDENTIAL_ID)]) {
-          sh 'echo "$DOCKER_PASSWORD" | podman login --tls-verify=false ${REGISTRY} -u "$DOCKER_USERNAME" --password-stdin'
-          sh "podman push --tls-verify=false ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:SNAPSHOT-${BRANCH_NAME}-${BUILD_NUMBER}"
+          sh '''
+            mvn -Dmaven.test.skip=true -gs `pwd`/configuration/settings.xml clean package
+            echo "$DOCKER_PASSWORD" | podman login --tls-verify=false ${REGISTRY} -u "$DOCKER_USERNAME" --password-stdin
+            podman build --tls-verify=false -f Dockerfile-online -t ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:SNAPSHOT-${BRANCH_NAME}-${BUILD_NUMBER} .
+            podman push --tls-verify=false ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:SNAPSHOT-${BRANCH_NAME}-${BUILD_NUMBER}
+          '''
         }
       }
     }
@@ -47,8 +47,13 @@ pipeline {
     stage('push latest') {
       when { branch 'master' }
       steps {
-        sh "podman tag ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:SNAPSHOT-${BRANCH_NAME}-${BUILD_NUMBER} ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:latest"
-        sh "podman push --tls-verify=false ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:latest"
+        withCredentials([usernamePassword(passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME', credentialsId: DOCKER_CREDENTIAL_ID)]) {
+          sh '''
+            echo "$DOCKER_PASSWORD" | podman login --tls-verify=false ${REGISTRY} -u "$DOCKER_USERNAME" --password-stdin
+            podman tag ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:SNAPSHOT-${BRANCH_NAME}-${BUILD_NUMBER} ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:latest
+            podman push --tls-verify=false ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:latest
+          '''
+        }
       }
     }
 
@@ -65,13 +70,20 @@ pipeline {
       steps {
         input(id: 'release-image-with-tag', message: 'release image with tag?')
         withCredentials([usernamePassword(credentialsId: GITHUB_CREDENTIAL_ID, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
-          sh 'git config --global user.email "kubesphere@yunify.com"'
-          sh 'git config --global user.name "kubesphere"'
-          sh "git tag -a ${TAG_NAME} -m \"${TAG_NAME}\""
-          sh "git push http://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${GITHUB_ACCOUNT}/devops-java-sample.git --tags --ipv4"
+          sh '''
+            git config --global user.email "kubesphere@yunify.com"
+            git config --global user.name "kubesphere"
+            git tag -a ${TAG_NAME} -m "${TAG_NAME}"
+            git push http://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${GITHUB_ACCOUNT}/devops-java-sample.git --tags --ipv4
+          '''
         }
-        sh "podman tag ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:SNAPSHOT-${BRANCH_NAME}-${BUILD_NUMBER} ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:${TAG_NAME}"
-        sh "podman push --tls-verify=false ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:${TAG_NAME}"
+        withCredentials([usernamePassword(passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME', credentialsId: DOCKER_CREDENTIAL_ID)]) {
+          sh '''
+            echo "$DOCKER_PASSWORD" | podman login --tls-verify=false ${REGISTRY} -u "$DOCKER_USERNAME" --password-stdin
+            podman tag ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:SNAPSHOT-${BRANCH_NAME}-${BUILD_NUMBER} ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:${TAG_NAME}
+            podman push --tls-verify=false ${REGISTRY}/${DOCKERHUB_NAMESPACE}/${APP_NAME}:${TAG_NAME}
+          '''
+        }
       }
     }
 
