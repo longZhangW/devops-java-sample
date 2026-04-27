@@ -1,4 +1,4 @@
-FROM eclipse-temurin:8-jre-alpine
+FROM 192.168.77.137:5000/adoptopenjdk/openjdk8:latest
 
 WORKDIR /home
 
