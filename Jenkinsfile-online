@@ -24,7 +24,7 @@ pipeline {
     SONAR_PROJECT_NAME = 'DevOps Java Sample'
   }
 
-
+  stages {
     stage('unit test') {
       steps {
         sh 'mvn clean -gs `pwd`/configuration/settings.xml test'
